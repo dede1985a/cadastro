@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cadastro de Clientes</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px auto;
+      max-width: 700px;
+      background-color: #f5f5f5;
+      padding: 10px;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    .formulario, .clientes {
+      background-color: white;
+      padding: 20px;
+      margin-top: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 12px;
+      background-color: #0077cc;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    button:hover {
+      background-color: #005fa3;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    li {
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      background-color: #eee;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    li.pendente {
+      color: red;
+    }
+
+    li.realizado {
+      color: blue;
+    }
+
+    li.visita {
+      color: orange;
+    }
+
+    #totalValor {
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .menu-opcoes {
+      position: absolute;
+      background: white;
+      border: 1px solid #ccc;
+      box-shadow: 0px 0px 10px rgba(0,0,0,0.2);
+      padding: 10px;
+      z-index: 9999;
+      display: none;
+      border-radius: 6px;
+    }
+
+    .menu-opcoes button {
+      display: block;
+      width: 100%;
+      margin: 5px 0;
+      font-size: 14px;
+      padding: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Cadastro de Clientes</h1>
+
+  <div class="formulario">
+    <label>Nome:</label>
+    <input type="text" id="nome" />
+
+    <label>Horário:</label>
+    <input type="text" id="horario" />
+
+    <label>Bairro:</label>
+    <input type="text" id="bairro" />
+
+    <label>Seguradora:</label>
+    <input type="text" id="seguradora" />
+
+    <label>Tipo de Serviço:</label>
+    <select id="servico" onchange="ajustarValorServico()">
+      <option value="">-- Selecione --</option>
+      <option value="Hidráulica">Hidráulica</option>
+      <option value="Elétrica">Elétrica</option>
+      <option value="Outros">Outros</option>
+    </select>
+
+    <label>Valor do Serviço (R$):</label>
+    <input type="text" id="valor" />
+
+    <button onclick="cadastrarCliente()">Salvar Cliente</button>
+  </div>
+
+  <div class="clientes">
+    <h2>Clientes do Dia</h2>
+    <ul id="listaClientes"></ul>
+    <div id="totalValor">Total dos Valores: R$ 0,00</div>
+    <button onclick="salvarRelatorio()">📄 Salvar Relatório do Dia</button>
+  </div>
+
+  <div class="menu-opcoes" id="menuOpcoes"></div>
+
+  <script>
+    let clientes = [];
+
+    function capitalizarNome(nome) {
+      return nome
+        .toLowerCase()
+        .split(' ')
+        .filter(w => w)
+        .map(p => p.charAt(0).toUpperCase() + p.slice(1))
+        .join(' ');
+    }
+
+    function corrigirTexto(txt) {
+      const dicionario = {
+        'eletrica': 'Elétrica',
+        'hidraulica': 'Hidráulica',
+        'seguradora': 'Seguradora'
+      };
+      return txt.replace(/\b(\w+)\b/gi, m => dicionario[m.toLowerCase()] || m);
+    }
+
+    function ajustarValorServico() {
+      const servico = document.getElementById("servico").value;
+      const campo = document.getElementById("valor");
+      if (servico === "Hidráulica" || servico === "Elétrica") campo.value = "45,00";
+    }
+
+    function cadastrarCliente() {
+      let nome = capitalizarNome(document.getElementById("nome").value.trim());
+      let horario = document.getElementById("horario").value.trim();
+      let bairro = corrigirTexto(document.getElementById("bairro").value.trim());
+      let seguradora = corrigirTexto(document.getElementById("seguradora").value.trim());
+      let servico = corrigirTexto(document.getElementById("servico").value);
+      let valorStr = document.getElementById("valor").value.trim();
+
+      if (!nome || !horario || !bairro || !seguradora || !servico || !valorStr) {
+        alert("Preencha todos os campos!");
+        return;
+      }
+
+      let valor = parseFloat(valorStr.replace(",", "."));
+      if (isNaN(valor)) {
+        alert("Valor inválido!");
+        return;
+      }
+
+      clientes.push({ nome, horario, bairro, seguradora, servico, valor, realizado: false });
+      atualizarLista();
+      document.querySelectorAll("input, select").forEach(e => e.value = "");
+    }
+
+    function atualizarLista() {
+      const ul = document.getElementById("listaClientes");
+      ul.innerHTML = "";
+
+      const ordenados = [...clientes].sort((a, b) => a.bairro.localeCompare(b.bairro));
+
+      ordenados.forEach((c, i) => {
+        const li = document.createElement("li");
+        let textoServico = c.servico;
+        if (c.servico === "Ficou na visita") {
+          textoServico = '🔔 <strong>Ficou na visita</strong>';
+        }
+        li.innerHTML = `${c.nome} - ${c.horario} - ${c.bairro} - ${c.seguradora} - ${textoServico} - R$ ${c.valor.toFixed(2).replace(".", ",")}`;
+
+        if (c.servico === "Ficou na visita") {
+          li.className = "visita";
+        } else if (c.realizado) {
+          li.className = "realizado";
+        } else {
+          li.className = "pendente";
+        }
+
+        li.dataset.index = clientes.indexOf(c);
+        ul.appendChild(li);
+      });
+
+      atualizarTotal();
+    }
+
+    function atualizarTotal() {
+      const total = clientes.reduce((s, c) => s + c.valor, 0);
+      document.getElementById("totalValor").textContent = `Total dos Valores: R$ ${total.toFixed(2).replace(".", ",")}`;
+    }
+
+    function mostrarMenuOpcoes(event, index) {
+      const menu = document.getElementById("menuOpcoes");
+      menu.innerHTML = `
+        <button onclick="marcarRealizado(${index})">✅ Marcar como Realizado</button>
+        <button onclick="marcarVisita(${index})">❌ Marcar como Visita (R$15,00)</button>
+        <button onclick="adicionarPontoAdicional(${index})">➕ Adicionar Ponto Adicional</button>
+      `;
+      menu.style.display = "block";
+      menu.style.top = event.pageY + "px";
+      menu.style.left = event.pageX + "px";
+    }
+
+    document.getElementById("listaClientes").addEventListener("click", function (e) {
+      const li = e.target.closest("li");
+      if (li) {
+        const index = li.dataset.index;
+        mostrarMenuOpcoes(e, index);
+        e.stopPropagation();
+      }
+    });
+
+    document.body.addEventListener("click", function () {
+      ocultarMenu();
+    });
+
+    function ocultarMenu() {
+      document.getElementById("menuOpcoes").style.display = "none";
+    }
+
+    function marcarRealizado(i) {
+      clientes[i].realizado = true;
+      atualizarLista();
+      ocultarMenu();
+    }
+
+    function marcarVisita(i) {
+      clientes[i].realizado = false;
+      clientes[i].servico = "Ficou na visita";
+      clientes[i].valor = 15.00;
+      atualizarLista();
+      ocultarMenu();
+    }
+
+    function adicionarPontoAdicional(i) {
+      const valorStr = prompt("Valor do ponto adicional:");
+      if (valorStr) {
+        const adicional = parseFloat(valorStr.replace(",", "."));
+        if (!isNaN(adicional) && adicional > 0) {
+          clientes[i].valor += adicional;
+          atualizarLista();
+        } else {
+          alert("Valor inválido.");
+        }
+      }
+      ocultarMenu();
+    }
+
+    function salvarRelatorio() {
+      let relatorio = "RELATÓRIO DO DIA\n\n";
+      const ordenados = [...clientes].sort((a, b) => a.bairro.localeCompare(b.bairro));
+
+      ordenados.forEach(c => {
+        relatorio += `${c.nome} - ${c.horario} - ${c.bairro} - ${c.seguradora} - ${c.servico} - R$ ${c.valor.toFixed(2).replace(".", ",")}\n`;
+      });
+
+      const total = ordenados.reduce((s, c) => s + c.valor, 0);
+      relatorio += `\nTOTAL DO DIA: R$ ${total.toFixed(2).replace(".", ",")}`;
+
+      // Data atual para nome do arquivo
+      const hoje = new Date();
+      const dia = String(hoje.getDate()).padStart(2, '0');
+      const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+      const ano = hoje.getFullYear();
+      const nomeArquivo = `relatorio_${dia}-${mes}-${ano}.txt`;
+
+      const blob = new Blob([relatorio], { type: "text/plain;charset=utf-8" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = nomeArquivo;
+      link.click();
+    }
+  </script>
+</body>
+</html>
+
+
